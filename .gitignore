@@ -2,3 +2,6 @@
 dwh.cfg
 .idea/
 venv/
+__pycache__/
+*.ipynb
+credentials.yaml
