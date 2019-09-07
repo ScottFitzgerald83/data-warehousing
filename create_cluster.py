@@ -126,11 +126,12 @@ def create_cluster(role_arn):
             print(e)
 
 
-def wait_for_cluster(cluster_identifier, target_status):
+def wait_for_cluster(cluster_identifier, target_status, interval=30):
     """
     Waits for a cluster to finish creaating or deleting, then returns control to the caller
     :param cluster_identifier: the redshift cluster identifier, i.e. name
     :param target_status: the desired outcome; i.e., 'available' or 'deleted'
+    :param interval: how long to sleep while waiting
     :return: Endpoint and role ARN if creating a cluster. If deleting, return None
     """
     cluster_properties = redshift.describe_clusters(ClusterIdentifier=cluster_identifier)['Clusters'][0]
@@ -138,7 +139,7 @@ def wait_for_cluster(cluster_identifier, target_status):
 
     while cluster_status != target_status:
         print(f'Current cluster status is {cluster_status}. Sleeping for 60s')
-        time.sleep(60)
+        time.sleep(interval)
         try:
             cluster_properties = redshift.describe_clusters(ClusterIdentifier=cluster_identifier)['Clusters'][0]
             cluster_status = cluster_properties['ClusterStatus']
@@ -232,16 +233,20 @@ def delete_role(role_name):
         print(e)
 
 
-def clean_up_cluster_and_role():
-    """Deletes the cluster and role created by this script"""
+def clean_up_cluster_and_role(wait=True):
+    """Deletes the cluster and role created by this script
+    :param wait: True reports on the status of deletion and hold execution
+    :return: None
+    """
     try:
         delete_cluster(DWH_CLUSTER_IDENTIFIER)
     except Exception as e:
         print(e)
-    try:
-        wait_for_cluster(DWH_CLUSTER_IDENTIFIER, 'deleted')
-    except Exception as e:
-        print(e)
+    if wait:
+        try:
+            wait_for_cluster(DWH_CLUSTER_IDENTIFIER, 'deleted')
+        except Exception as e:
+            print(e)
     detach_role_policy(DWH_IAM_ROLE_NAME)
     delete_role(DWH_IAM_ROLE_NAME)
 
@@ -260,4 +265,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    # clean_up_cluster_and_role()
