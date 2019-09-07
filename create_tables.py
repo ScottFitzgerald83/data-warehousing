@@ -13,10 +13,6 @@ def create_tables(cur, conn):
         cur.execute(query)
         conn.commit()
 
-def load_staging_tables(cur, conn):
-    for query in copy_table_queries:
-        cur.execute(query)
-        conn.commit()
 
 def main():
     config = configparser.ConfigParser()
@@ -27,7 +23,6 @@ def main():
 
     drop_tables(cur, conn)
     create_tables(cur, conn)
-    load_staging_tables(cur, conn)
 
     conn.close()
 
