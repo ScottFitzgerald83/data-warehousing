@@ -123,22 +123,6 @@ staging_events_copy = build_copy_sql('events_stage', LOG_DATA, json_format=LOG_J
 staging_songs_copy = build_copy_sql('songs_stage', SONG_DATA, json_format="'auto'")
 
 # FINAL TABLES
-
-songplay_table_insert = ("""
-""")
-
-user_table_insert = ("""
-""")
-
-song_table_insert = ("""
-""")
-
-artist_table_insert = ("""
-""")
-
-time_table_insert = ("""
-# """)
-
 # Load song data from staging table into songs
 songs_load = """
     INSERT INTO songs
@@ -164,7 +148,7 @@ artists_load = """
 """
 
 # Load unique users from staging table into users
-# For users with multiple levels, selects the latest level
+# For users with multiple levels, selects the most recent level
 users_load = """
     INSERT INTO users
     SELECT DISTINCT
@@ -225,5 +209,4 @@ create_table_queries = [staging_events_table_create, staging_songs_table_create,
                         user_table_create, song_table_create, artist_table_create, time_table_create]
 drop_tables_query = drop_table_sql
 copy_table_queries = [staging_events_copy, staging_songs_copy]
-insert_table_queries = [songplay_table_insert, user_table_insert, song_table_insert, artist_table_insert,
-                        time_table_insert]
+insert_table_queries = [songplays_load, users_load, songs_load, artists_load, time_load]
