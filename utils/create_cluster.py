@@ -1,5 +1,6 @@
 import configparser
 import json
+import sys
 import time
 
 import boto3
@@ -8,7 +9,7 @@ ecs = boto3.client('ecs')
 
 # Read AWS credentials
 config = configparser.ConfigParser()
-config.read_file(open('dwh.cfg'))
+config.read_file(open('../dwh.cfg'))
 
 # Set AWS credentials and region
 KEY = config.get('AWS', 'KEY')
@@ -85,12 +86,14 @@ def get_arn(role_name):
         print(e)
 
 
-def create_cluster(role_arn, single_node=False):
+def create_cluster(role_arn):
     """
-    Creates a cluster in Redshift
+    Creates a cluster in Redshift.
     :param role_arn: the IAM role being granted access
     :return: create cluster response
     """
+    # Num nodes must not be included when instantiating single-node "clusters"
+    # If num_nodes is 1, then we don't pass this parameter to the boto client
     if int(DWH_NUM_NODES) > 1:
         try:
             response = redshift.create_cluster(
@@ -263,5 +266,18 @@ def main():
 
 
 if __name__ == '__main__':
-    # main()
-    clean_up_cluster_and_role(wait=False)
+    try:
+        if sys.argv[1] == 'create':
+            main()
+        elif sys.argv[1] == 'delete':
+            clean_up_cluster_and_role()
+        else:
+            print('Arg must be one of create|delete')
+            print('To create a cluster from dwh.cfg: create_cluster.py create')
+            print('To delete the cluster from dwh.cfg: create_cluster.py delete')
+            sys.exit(1)
+    except IndexError:
+        print('Usage: python3 create_cluster [create|delete]')
+        print('Arg must be one of create|delete')
+        print('Exiting')
+        sys.exit(1)
