@@ -1,6 +1,9 @@
 import configparser
-
-# CONFIG
+"""
+CONFIG
+Import Redshift credentials from file named dwh.cfg. If this file is missing or has missing or  incorrect
+credentials, the Redshift commands will fail. See the README for more details
+"""
 config = configparser.ConfigParser()
 config.read('dwh.cfg')
 
@@ -9,11 +12,19 @@ LOG_DATA = config.get('S3', 'LOG_DATA')
 LOG_JSONPATH = config.get('S3', 'LOG_JSONPATH')
 SONG_DATA = config.get('S3', 'SONG_DATA')
 
-# DROP TABLES
+
+"""
+DROP TABLES
+Drops the Sparkify tables if they exist
+"""
 drop_table_sql = 'DROP TABLE IF EXISTS events_stage, songs_stage, songplays, users, songs, artists, time'
 
-# CREATE TABLES
-staging_events_table_create = """
+
+"""
+CREATE STAGING TABLES
+The following SQL is used to create the staging tables
+"""
+events_stage_create = """
 CREATE TABLE events_stage(
     artist           VARCHAR           ENCODE ZSTD,
     auth             VARCHAR           ENCODE ZSTD,
@@ -36,7 +47,7 @@ CREATE TABLE events_stage(
 );
 """
 
-staging_songs_table_create = """
+songs_stage_create = """
 CREATE TABLE songs_stage (
     artist_id         VARCHAR           ENCODE ZSTD,
     artist_latitude   DOUBLE PRECISION  ENCODE ZSTD,
@@ -51,11 +62,62 @@ CREATE TABLE songs_stage (
 );
 """
 
-songplay_table_create = """
+"""
+CREATE ANALYTICS TABLES
+The following SQL is used to create the analytics tables
+"""
+
+songs_create = """
+CREATE TABLE songs(
+  song_id    VARCHAR           ENCODE ZSTD,
+  title      VARCHAR           ENCODE ZSTD,
+  artist_id  VARCHAR           ENCODE ZSTD DISTKEY,
+  year       INTEGER           ENCODE ZSTD,
+  duration   DOUBLE PRECISION  ENCODE ZSTD
+)
+SORTKEY(title);
+"""
+
+artists_create = """
+CREATE TABLE artists(
+    artist_id  VARCHAR           ENCODE ZSTD  SORTKEY,
+    name       VARCHAR           ENCODE ZSTD,
+    location   VARCHAR           ENCODE ZSTD,
+    latitude   DOUBLE PRECISION  ENCODE ZSTD,
+    longitude  DOUBLE PRECISION  ENCODE ZSTD
+)
+DISTSTYLE AUTO;
+"""
+
+users_create = """
+CREATE TABLE users (
+  user_id     INTEGER  ENCODE ZSTD SORTKEY,
+  first_name  VARCHAR  ENCODE ZSTD,
+  last_name   VARCHAR  ENCODE ZSTD,
+  gender      VARCHAR  ENCODE ZSTD,
+  level       VARCHAR  ENCODE ZSTD
+)
+DISTSTYLE ALL;
+"""
+
+time_create = """
+CREATE TABLE time(
+    start_time  TIMESTAMP  ENCODE DELTA32K  SORTKEY,
+    hour        INTEGER    ENCODE ZSTD,
+    day         INTEGER    ENCODE ZSTD,
+    week        INTEGER    ENCODE ZSTD,
+    month       INTEGER    ENCODE ZSTD,
+    year        INTEGER    ENCODE ZSTD,
+    weekday     INTEGER    ENCODE ZSTD
+)
+DISTSTYLE AUTO;
+"""
+
+songplay_create = """
 CREATE TABLE songplays(
   songplay_id  INTEGER  IDENTITY(0,1)  ENCODE ZSTD,
-  start_time   TIMESTAMP               ENCODE DELTA32K,
-  user_id      INTEGER                 ENCODE ZSTD,
+  start_time   TIMESTAMP               ENCODE DELTA32K SORTKEY,
+  user_id      INTEGER                 ENCODE ZSTD  DISTKEY,
   level        VARCHAR                 ENCODE ZSTD,
   song_id      VARCHAR                 ENCODE ZSTD,
   artist_id    VARCHAR                 ENCODE ZSTD,
@@ -65,50 +127,11 @@ CREATE TABLE songplays(
 );
 """
 
-user_table_create = """
-CREATE TABLE users (
-  user_id     INTEGER  ENCODE ZSTD,
-  first_name  VARCHAR  ENCODE ZSTD,
-  last_name   VARCHAR  ENCODE ZSTD,
-  gender      VARCHAR  ENCODE ZSTD,
-  level       VARCHAR  ENCODE ZSTD
-);
+"""
+LOAD STAGING TABLES
+The following code is used to load the staging tables
 """
 
-song_table_create = """
-CREATE TABLE songs(
-  song_id    VARCHAR           ENCODE ZSTD,
-  title      VARCHAR           ENCODE ZSTD,
-  artist_id  VARCHAR           ENCODE ZSTD,
-  year       INTEGER           ENCODE ZSTD,
-  duration   DOUBLE PRECISION  ENCODE ZSTD
-);
-"""
-
-artist_table_create = """
-CREATE TABLE artists (
-    artist_id  VARCHAR           ENCODE ZSTD,
-    name       VARCHAR           ENCODE ZSTD,
-    location   VARCHAR           ENCODE ZSTD,
-    latitude   DOUBLE PRECISION  ENCODE ZSTD,
-    longitude  DOUBLE PRECISION  ENCODE ZSTD
-);
-"""
-
-time_table_create = """
-CREATE TABLE time(
-    start_time  TIMESTAMP  ENCODE DELTA32K,
-    hour        INTEGER    ENCODE ZSTD,
-    day         INTEGER    ENCODE ZSTD,
-    week        INTEGER    ENCODE ZSTD,
-    month       INTEGER    ENCODE ZSTD,
-    year        INTEGER    ENCODE ZSTD,
-    weekday     INTEGER    ENCODE ZSTD
-);
-"""
-
-
-# STAGING TABLES
 def build_copy_sql(table, filepath, json_format):
     return f"""
     COPY {table}
@@ -118,11 +141,14 @@ def build_copy_sql(table, filepath, json_format):
     """
 
 
-staging_events_copy = build_copy_sql('events_stage', LOG_DATA, json_format=LOG_JSONPATH)
+events_stage_load = build_copy_sql('events_stage', LOG_DATA, json_format=LOG_JSONPATH)
+songs_stage_load = build_copy_sql('songs_stage', SONG_DATA, json_format="'auto'")
 
-staging_songs_copy = build_copy_sql('songs_stage', SONG_DATA, json_format="'auto'")
+"""
+LOAD FINAL TABLES
+The following code is used to load the final (analytics) tables
+"""
 
-# FINAL TABLES
 # Load song data from staging table into songs
 songs_load = """
     INSERT INTO songs
@@ -188,6 +214,7 @@ time_load = """
 """
 
 # Load songplays data from staging table, joining on songs and artists
+# We only care about records in the events staging table that have a page of 'NextSong'
 songplays_load = """
     INSERT INTO songplays (start_time, user_id, level, song_id, artist_id, session_id, location, user_agent)
     SELECT DISTINCT
@@ -204,10 +231,12 @@ songplays_load = """
     LEFT JOIN artists a ON a.name = e.artist
     WHERE e.page = 'NextSong'
 """
-# QUERY LISTS
 
-create_table_queries = [staging_events_table_create, staging_songs_table_create, songplay_table_create,
-                        user_table_create, song_table_create, artist_table_create, time_table_create]
+"""
+LISTS TO STORE EACH CATEGORY OF QUERY
+"""
 drop_tables_query = drop_table_sql
-copy_table_queries = [staging_events_copy, staging_songs_copy]
+create_table_queries = [events_stage_create, songs_stage_create, songplay_create, users_create, songs_create,
+                        artists_create, time_create]
+copy_table_queries = [events_stage_load, songs_stage_load]
 insert_table_queries = [songplays_load, users_load, songs_load, artists_load, time_load]
