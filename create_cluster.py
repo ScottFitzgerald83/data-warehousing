@@ -85,7 +85,7 @@ def get_arn(role_name):
         print(e)
 
 
-def create_cluster(role_arn):
+def create_cluster(role_arn, single_node=False):
     """
     Creates a cluster in Redshift
     :param role_arn: the IAM role being granted access
@@ -176,20 +176,6 @@ def open_port(my_cluster_properties, ip_address='0.0.0.0/0', protocol='tcp', por
         print(e)
 
 
-def delete_cluster(cluster_identifier, skip_snapshot=True):
-    """
-    Deletes a cluster. Does not take a snapshot by default
-    :param cluster_identifier: the cluster identifier
-    :param skip_snapshot: False if you want to keep a snapshot
-    :return: None
-    """
-    try:
-        redshift.delete_cluster(ClusterIdentifier=cluster_identifier, SkipFinalClusterSnapshot=skip_snapshot)
-        print(f"Deleting cluster {cluster_identifier}")
-    except Exception as e:
-        print(e)
-
-
 def describe_cluster(cluster_identifier):
     """
     Gives the status of a cluster
@@ -233,18 +219,31 @@ def delete_role(role_name):
         print(e)
 
 
-def clean_up_cluster_and_role(wait=True):
-    """Deletes the cluster and role created by this script
-    :param wait: True reports on the status of deletion and hold execution
+def delete_cluster(cluster_identifier, skip_snapshot=True):
+    """
+    Deletes a cluster. Does not take a snapshot by default
+    :param cluster_identifier: the cluster identifier
+    :param skip_snapshot: False if you want to keep a snapshot
     :return: None
     """
     try:
-        delete_cluster(DWH_CLUSTER_IDENTIFIER)
+        redshift.delete_cluster(ClusterIdentifier=cluster_identifier, SkipFinalClusterSnapshot=skip_snapshot)
+        print(f"Deleting cluster {cluster_identifier}")
     except Exception as e:
         print(e)
+
+
+def clean_up_cluster_and_role(wait=True, skip_snapshot=True, interval=30):
+    """Deletes the cluster and role created by this script
+    :param skip_snapshot: False if you want to keep a snapshot
+    :param wait: True reports on the status of deletion and hold execution
+    :param interval: True reports on the status of deletion and hold execution
+    :return: None
+    """
+    delete_cluster(DWH_CLUSTER_IDENTIFIER, skip_snapshot)
     if wait:
         try:
-            wait_for_cluster(DWH_CLUSTER_IDENTIFIER, 'deleted')
+            wait_for_cluster(DWH_CLUSTER_IDENTIFIER, 'deleted', interval)
         except Exception as e:
             print(e)
     detach_role_policy(DWH_IAM_ROLE_NAME)
@@ -264,4 +263,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    clean_up_cluster_and_role(wait=False)

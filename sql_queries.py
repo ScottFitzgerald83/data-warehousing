@@ -202,6 +202,7 @@ songplays_load = """
     FROM events_stage e
     LEFT JOIN songs s ON s.title = e.song
     LEFT JOIN artists a ON a.name = e.artist
+    WHERE e.page = 'NextSong'
 """
 # QUERY LISTS
 
