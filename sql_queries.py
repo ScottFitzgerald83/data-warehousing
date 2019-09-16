@@ -1,4 +1,5 @@
 import configparser
+
 """
 CONFIG
 Import Redshift credentials from file named dwh.cfg. If this file is missing or has missing or  incorrect
@@ -12,13 +13,11 @@ LOG_DATA = config.get('S3', 'LOG_DATA')
 LOG_JSONPATH = config.get('S3', 'LOG_JSONPATH')
 SONG_DATA = config.get('S3', 'SONG_DATA')
 
-
 """
 DROP TABLES
 Drops the Sparkify tables if they exist
 """
 drop_table_sql = 'DROP TABLE IF EXISTS events_stage, songs_stage, songplays, users, songs, artists, time'
-
 
 """
 CREATE STAGING TABLES
@@ -69,9 +68,9 @@ The following SQL is used to create the analytics tables
 
 songs_create = """
 CREATE TABLE songs(
-  song_id    VARCHAR           ENCODE ZSTD,
-  title      VARCHAR           ENCODE ZSTD,
-  artist_id  VARCHAR           ENCODE ZSTD,
+  song_id    VARCHAR          NOT NULL ENCODE ZSTD,
+  title      VARCHAR          ENCODE ZSTD,
+  artist_id  VARCHAR          NOT NULL ENCODE ZSTD,
   year       INTEGER           ENCODE ZSTD,
   duration   DOUBLE PRECISION  ENCODE ZSTD
 )
@@ -80,8 +79,8 @@ SORTKEY(title);
 
 artists_create = """
 CREATE TABLE artists(
-    artist_id  VARCHAR           ENCODE ZSTD,
-    name       VARCHAR           ENCODE ZSTD,
+    artist_id  VARCHAR           NOT NULL ENCODE ZSTD,
+    name       VARCHAR           NOT NULL ENCODE ZSTD,
     location   VARCHAR           ENCODE ZSTD,
     latitude   DOUBLE PRECISION  ENCODE ZSTD,
     longitude  DOUBLE PRECISION  ENCODE ZSTD
@@ -90,18 +89,18 @@ CREATE TABLE artists(
 
 users_create = """
 CREATE TABLE users (
-  user_id     INTEGER  ENCODE ZSTD,
-  first_name  VARCHAR  ENCODE ZSTD,
-  last_name   VARCHAR  ENCODE ZSTD,
-  gender      VARCHAR  ENCODE ZSTD,
-  level       VARCHAR  ENCODE ZSTD
+  user_id     INTEGER  NOT NULL     ENCODE ZSTD,
+  first_name  VARCHAR  NOT NULL     ENCODE ZSTD,
+  last_name   VARCHAR  NOT NULL     ENCODE ZSTD,
+  gender      VARCHAR               ENCODE ZSTD,
+  level       VARCHAR               ENCODE ZSTD
 )
 DISTSTYLE ALL;
 """
 
 time_create = """
 CREATE TABLE time(
-    start_time  TIMESTAMP  ENCODE DELTA32K,
+    start_time  TIMESTAMP  NOT NULL ENCODE DELTA32K,
     hour        INTEGER    ENCODE ZSTD,
     day         INTEGER    ENCODE ZSTD,
     week        INTEGER    ENCODE ZSTD,
@@ -130,6 +129,7 @@ LOAD STAGING TABLES
 The following code is used to load the staging tables
 """
 
+
 def build_copy_sql(table, filepath, json_format):
     return f"""
     COPY {table}
@@ -155,7 +155,9 @@ songs_load = """
         artist_id,
         year,
         duration
-    FROM songs_stage;
+    FROM songs_stage
+    WHERE song_id IS NOT NULL
+    AND artist_id IS NOT NULL;
 """
 
 # Load artist data from staging table into artists
@@ -167,7 +169,9 @@ artists_load = """
         artist_location,
         artist_latitude,
         artist_longitude
-    FROM songs_stage;
+    FROM songs_stage
+    WHERE artist_id IS NOT NULL
+    AND artist_name IS NOT NULL;
 """
 
 # Load unique users from staging table into users
@@ -191,6 +195,9 @@ users_load = """
         FROM events_stage
         ORDER BY ts DESC
     ) users_temp
+    WHERE user_id IS NOT NULL
+    AND first_name IS NOT NULL
+    AND last_name IS NOT NULL;
 """
 
 # Extract, convert, and split log timestamps to load into time table
@@ -207,7 +214,8 @@ time_load = """
     FROM (
       SELECT timestamp 'epoch' + ts / 1000 * interval '1 second' AS ts
       FROM events_stage
-    ) next_song_ts;
+    ) next_song_ts
+    WHERE next_song_ts.ts IS NOT NULL;
 """
 
 # Load songplays data from staging table, joining on songs and artists

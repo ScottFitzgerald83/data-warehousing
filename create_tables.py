@@ -1,4 +1,5 @@
 import configparser
+
 import psycopg2
 from sql_queries import drop_tables_query, create_table_queries
 

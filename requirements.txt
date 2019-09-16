@@ -1,0 +1,4 @@
+psycopg2==2.8.3
+boto3==1.9.228
+jupyter==1.0.0
+pandas==0.25.1
