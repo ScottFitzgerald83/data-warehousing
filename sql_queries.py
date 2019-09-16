@@ -72,7 +72,8 @@ CREATE TABLE songs(
   title      VARCHAR          ENCODE ZSTD,
   artist_id  VARCHAR          NOT NULL ENCODE ZSTD,
   year       INTEGER           ENCODE ZSTD,
-  duration   DOUBLE PRECISION  ENCODE ZSTD
+  duration   DOUBLE PRECISION  ENCODE ZSTD,
+  PRIMARY KEY (song_id)
 )
 SORTKEY(title);
 """
@@ -83,7 +84,8 @@ CREATE TABLE artists(
     name       VARCHAR           NOT NULL ENCODE ZSTD,
     location   VARCHAR           ENCODE ZSTD,
     latitude   DOUBLE PRECISION  ENCODE ZSTD,
-    longitude  DOUBLE PRECISION  ENCODE ZSTD
+    longitude  DOUBLE PRECISION  ENCODE ZSTD,
+    PRIMARY KEY (artist_id)
 )
 """
 
@@ -93,7 +95,8 @@ CREATE TABLE users (
   first_name  VARCHAR  NOT NULL     ENCODE ZSTD,
   last_name   VARCHAR  NOT NULL     ENCODE ZSTD,
   gender      VARCHAR               ENCODE ZSTD,
-  level       VARCHAR               ENCODE ZSTD
+  level       VARCHAR               ENCODE ZSTD,
+  PRIMARY KEY (user_id)
 )
 DISTSTYLE ALL;
 """
@@ -106,7 +109,8 @@ CREATE TABLE time(
     week        INTEGER    ENCODE ZSTD,
     month       INTEGER    ENCODE ZSTD,
     year        INTEGER    ENCODE ZSTD,
-    weekday     INTEGER    ENCODE ZSTD
+    weekday     INTEGER    ENCODE ZSTD,
+    PRIMARY KEY (start_time)
 )
 """
 
@@ -120,7 +124,8 @@ CREATE TABLE songplays(
   artist_id    VARCHAR                 ENCODE ZSTD,
   session_id   INTEGER                 ENCODE ZSTD,
   location     VARCHAR                 ENCODE ZSTD,
-  user_agent   VARCHAR                 ENCODE ZSTD
+  user_agent   VARCHAR                 ENCODE ZSTD,
+  PRIMARY KEY (songplay_id)
 );
 """
 
@@ -191,13 +196,15 @@ users_load = """
             first_name,
             last_name,
             gender,
-            level
+            level,
+            page
         FROM events_stage
         ORDER BY ts DESC
     ) users_temp
     WHERE user_id IS NOT NULL
     AND first_name IS NOT NULL
-    AND last_name IS NOT NULL;
+    AND last_name IS NOT NULL
+    AND page = 'NextSong';
 """
 
 # Extract, convert, and split log timestamps to load into time table
@@ -212,8 +219,8 @@ time_load = """
        extract(year FROM ts) as year,
        extract(dow FROM ts) as weekday
     FROM (
-      SELECT timestamp 'epoch' + ts / 1000 * interval '1 second' AS ts
-      FROM events_stage
+      SELECT start_time AS ts
+      FROM songplays
     ) next_song_ts
     WHERE next_song_ts.ts IS NOT NULL;
 """

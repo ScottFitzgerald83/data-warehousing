@@ -5,12 +5,24 @@ from sql_queries import copy_table_queries, insert_table_queries
 
 
 def load_staging_tables(cur, conn):
+    """
+    Loads staging tables by executing SQL in copy_table_queries
+    :param cur: psycopg cursor
+    :param conn: psycopg connection object
+    :return: None
+    """
     for query in copy_table_queries:
         cur.execute(query)
         conn.commit()
 
 
 def insert_tables(cur, conn):
+    """
+    Loads analytic tables by executing SQL in insert_table_queries
+    :param cur: psycopg cursor
+    :param conn: psycopg connection object
+    :return: None
+    """
     for query in insert_table_queries:
         cur.execute(query)
         conn.commit()
