@@ -71,7 +71,7 @@ songs_create = """
 CREATE TABLE songs(
   song_id    VARCHAR           ENCODE ZSTD,
   title      VARCHAR           ENCODE ZSTD,
-  artist_id  VARCHAR           ENCODE ZSTD DISTKEY,
+  artist_id  VARCHAR           ENCODE ZSTD,
   year       INTEGER           ENCODE ZSTD,
   duration   DOUBLE PRECISION  ENCODE ZSTD
 )
@@ -80,18 +80,17 @@ SORTKEY(title);
 
 artists_create = """
 CREATE TABLE artists(
-    artist_id  VARCHAR           ENCODE ZSTD  SORTKEY,
+    artist_id  VARCHAR           ENCODE ZSTD,
     name       VARCHAR           ENCODE ZSTD,
     location   VARCHAR           ENCODE ZSTD,
     latitude   DOUBLE PRECISION  ENCODE ZSTD,
     longitude  DOUBLE PRECISION  ENCODE ZSTD
 )
-DISTSTYLE AUTO;
 """
 
 users_create = """
 CREATE TABLE users (
-  user_id     INTEGER  ENCODE ZSTD SORTKEY,
+  user_id     INTEGER  ENCODE ZSTD,
   first_name  VARCHAR  ENCODE ZSTD,
   last_name   VARCHAR  ENCODE ZSTD,
   gender      VARCHAR  ENCODE ZSTD,
@@ -102,7 +101,7 @@ DISTSTYLE ALL;
 
 time_create = """
 CREATE TABLE time(
-    start_time  TIMESTAMP  ENCODE DELTA32K  SORTKEY,
+    start_time  TIMESTAMP  ENCODE DELTA32K,
     hour        INTEGER    ENCODE ZSTD,
     day         INTEGER    ENCODE ZSTD,
     week        INTEGER    ENCODE ZSTD,
@@ -110,14 +109,13 @@ CREATE TABLE time(
     year        INTEGER    ENCODE ZSTD,
     weekday     INTEGER    ENCODE ZSTD
 )
-DISTSTYLE AUTO;
 """
 
 songplay_create = """
 CREATE TABLE songplays(
   songplay_id  INTEGER  IDENTITY(0,1)  ENCODE ZSTD,
-  start_time   TIMESTAMP               ENCODE DELTA32K SORTKEY,
-  user_id      INTEGER                 ENCODE ZSTD  DISTKEY,
+  start_time   TIMESTAMP               ENCODE DELTA32K,
+  user_id      INTEGER                 ENCODE ZSTD,
   level        VARCHAR                 ENCODE ZSTD,
   song_id      VARCHAR                 ENCODE ZSTD,
   artist_id    VARCHAR                 ENCODE ZSTD,
@@ -148,7 +146,6 @@ songs_stage_load = build_copy_sql('songs_stage', SONG_DATA, json_format="'auto'"
 LOAD FINAL TABLES
 The following code is used to load the final (analytics) tables
 """
-
 # Load song data from staging table into songs
 songs_load = """
     INSERT INTO songs
@@ -217,19 +214,18 @@ time_load = """
 # We only care about records in the events staging table that have a page of 'NextSong'
 songplays_load = """
     INSERT INTO songplays (start_time, user_id, level, song_id, artist_id, session_id, location, user_agent)
-    SELECT DISTINCT
-        timestamp 'epoch' + e.ts / 1000 * interval '1 second' AS ts,
-        e.user_id,
-        e.level,
-        s.song_id,
-        a.artist_id,
-        e.session_id,
-        e.location,
-        e.user_agent
-    FROM events_stage e
-    LEFT JOIN songs s ON s.title = e.song
-    LEFT JOIN artists a ON a.name = e.artist
-    WHERE e.page = 'NextSong'
+    SELECT
+        TIMESTAMP 'epoch' + es.ts / 1000 * INTERVAL '1 second' AS ts,
+        user_id,
+        level,
+        ss.song_id,
+        ss.artist_id,
+        session_id,
+        location,
+        user_agent
+    FROM events_stage es
+    LEFT JOIN songs_stage ss ON es.artist = ss.artist_name AND es.song = ss.title
+    WHERE page = 'NextSong'
 """
 
 """
