@@ -1,5 +1,6 @@
 import configparser
 import json
+import sys
 import time
 
 import boto3
@@ -8,7 +9,7 @@ ecs = boto3.client('ecs')
 
 # Read AWS credentials
 config = configparser.ConfigParser()
-config.read_file(open('dwh.cfg'))
+config.read_file(open('../dwh.cfg'))
 
 # Set AWS credentials and region
 KEY = config.get('AWS', 'KEY')
@@ -87,10 +88,12 @@ def get_arn(role_name):
 
 def create_cluster(role_arn):
     """
-    Creates a cluster in Redshift
+    Creates a cluster in Redshift.
     :param role_arn: the IAM role being granted access
     :return: create cluster response
     """
+    # Num nodes must not be included when instantiating single-node "clusters"
+    # If num_nodes is 1, then we don't pass this parameter to the boto client
     if int(DWH_NUM_NODES) > 1:
         try:
             response = redshift.create_cluster(
@@ -176,20 +179,6 @@ def open_port(my_cluster_properties, ip_address='0.0.0.0/0', protocol='tcp', por
         print(e)
 
 
-def delete_cluster(cluster_identifier, skip_snapshot=True):
-    """
-    Deletes a cluster. Does not take a snapshot by default
-    :param cluster_identifier: the cluster identifier
-    :param skip_snapshot: False if you want to keep a snapshot
-    :return: None
-    """
-    try:
-        redshift.delete_cluster(ClusterIdentifier=cluster_identifier, SkipFinalClusterSnapshot=skip_snapshot)
-        print(f"Deleting cluster {cluster_identifier}")
-    except Exception as e:
-        print(e)
-
-
 def describe_cluster(cluster_identifier):
     """
     Gives the status of a cluster
@@ -233,18 +222,31 @@ def delete_role(role_name):
         print(e)
 
 
-def clean_up_cluster_and_role(wait=True):
-    """Deletes the cluster and role created by this script
-    :param wait: True reports on the status of deletion and hold execution
+def delete_cluster(cluster_identifier, skip_snapshot=True):
+    """
+    Deletes a cluster. Does not take a snapshot by default
+    :param cluster_identifier: the cluster identifier
+    :param skip_snapshot: False if you want to keep a snapshot
     :return: None
     """
     try:
-        delete_cluster(DWH_CLUSTER_IDENTIFIER)
+        redshift.delete_cluster(ClusterIdentifier=cluster_identifier, SkipFinalClusterSnapshot=skip_snapshot)
+        print(f"Deleting cluster {cluster_identifier}")
     except Exception as e:
         print(e)
+
+
+def clean_up_cluster_and_role(wait=True, skip_snapshot=True, interval=30):
+    """Deletes the cluster and role created by this script
+    :param skip_snapshot: False if you want to keep a snapshot
+    :param wait: True reports on the status of deletion and hold execution
+    :param interval: True reports on the status of deletion and hold execution
+    :return: None
+    """
+    delete_cluster(DWH_CLUSTER_IDENTIFIER, skip_snapshot)
     if wait:
         try:
-            wait_for_cluster(DWH_CLUSTER_IDENTIFIER, 'deleted')
+            wait_for_cluster(DWH_CLUSTER_IDENTIFIER, 'deleted', interval)
         except Exception as e:
             print(e)
     detach_role_policy(DWH_IAM_ROLE_NAME)
@@ -264,4 +266,18 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        if sys.argv[1] == 'create':
+            main()
+        elif sys.argv[1] == 'delete':
+            clean_up_cluster_and_role()
+        else:
+            print('Arg must be one of create|delete')
+            print('To create a cluster from dwh.cfg: create_cluster.py create')
+            print('To delete the cluster from dwh.cfg: create_cluster.py delete')
+            sys.exit(1)
+    except IndexError:
+        print('Usage: python3 create_cluster [create|delete]')
+        print('Arg must be one of create|delete')
+        print('Exiting')
+        sys.exit(1)
