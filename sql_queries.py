@@ -139,8 +139,8 @@ def build_copy_sql(table, filepath, json_format):
     """
 
 
-events_stage_load = build_copy_sql('events_stage', LOG_DATA, json_format=LOG_JSONPATH)
-songs_stage_load = build_copy_sql('songs_stage', SONG_DATA, json_format="'auto'")
+events_stage_load = build_copy_sql(table='events_stage', filepath=LOG_DATA, json_format=LOG_JSONPATH)
+songs_stage_load = build_copy_sql(table='songs_stage', filepath=SONG_DATA, json_format="'auto'")
 
 """
 LOAD FINAL TABLES
@@ -214,7 +214,7 @@ time_load = """
 # We only care about records in the events staging table that have a page of 'NextSong'
 songplays_load = """
     INSERT INTO songplays (start_time, user_id, level, song_id, artist_id, session_id, location, user_agent)
-    SELECT
+    SELECT DISTINCT
         TIMESTAMP 'epoch' + es.ts / 1000 * INTERVAL '1 second' AS ts,
         user_id,
         level,
