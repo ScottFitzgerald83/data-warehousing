@@ -53,7 +53,7 @@ Description: A collection of unique songs found across all the `song_data` JSON 
 
 ##### Table structure
 |Column|Type|Modifiers|
-|-|-|-|-|
+|-|-|-|
 | song_id   | character varying(256) |  not null   |
 | title     | character varying(256) |             |
 | artist_id | character varying(256) |  not null   |
